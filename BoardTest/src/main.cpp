@@ -66,8 +66,10 @@
 // Components.
 VL53L4CX sensor_vl53l4cx_sat(&DEV_I2C, 0);
 
-String VL53L4CX_RangeStatusCode(uint8_t status) {
-  switch (status) {
+String VL53L4CX_RangeStatusCode(uint8_t status)
+{
+  switch (status)
+  {
   case VL53L4CX_RANGESTATUS_RANGE_VALID:
     return "VL53L4CX_RANGESTATUS_RANGE_VALID";
   case VL53L4CX_RANGESTATUS_SIGMA_FAIL:
@@ -105,7 +107,8 @@ String VL53L4CX_RangeStatusCode(uint8_t status) {
 
 /* Setup ---------------------------------------------------------------------*/
 
-void setup() {
+void setup()
+{
   // Led.
   pinMode(LedPin, OUTPUT);
 
@@ -119,73 +122,62 @@ void setup() {
   // Configure VL53L4CX satellite component.
   sensor_vl53l4cx_sat.begin();
 
-  // Switch off VL53L4CX satellite component.
-  sensor_vl53l4cx_sat.VL53L4CX_Off();
-
   // Initialize VL53L4CX satellite component.
   sensor_vl53l4cx_sat.InitSensor(0x12);
+  VL53L4CX_Error status;
 
+  status = sensor_vl53l4cx_sat.VL53L4CX_SetMeasurementTimingBudgetMicroSeconds(10000000 - 1);
+  SerialPort.printf("VL53L4CX_SetMeasurementTimingBudgetMicroSeconds status: %d\r\n", status);
+  status = sensor_vl53l4cx_sat.VL53L4CX_SetDistanceMode(VL53L4CX_DISTANCEMODE_LONG);
+  SerialPort.printf("VL53L4CX_SetDistanceMode status: %d\r\n", status);
+  status = sensor_vl53l4cx_sat.VL53L4CX_SmudgeCorrectionEnable(VL53L4CX_SMUDGE_CORRECTION_CONTINUOUS);
+  SerialPort.printf("VL53L4CX_SmudgeCorrectionEnable status: %d\r\n", status);
 
-
-
-     // Start Measurements
-  sensor_vl53l4cx_sat.VL53L4CX_StartMeasurement();
+  // Start Measurements
+  status = sensor_vl53l4cx_sat.VL53L4CX_StartMeasurement();
+  SerialPort.printf("VL53L4CX_StartMeasurement status: %d\r\n", status);
 }
 
-void loop() {
+void loop()
+{
   VL53L4CX_MultiRangingData_t MultiRangingData;
   VL53L4CX_MultiRangingData_t *pMultiRangingData = &MultiRangingData;
   uint8_t NewDataReady = 0;
-  int no_of_object_found = 0, j;
   char report[64];
   int status;
 
-  delay(100);
-
-  do {
-    status =
-        sensor_vl53l4cx_sat.VL53L4CX_GetMeasurementDataReady(&NewDataReady);
-    SerialPort.print("  Status = ");
-    SerialPort.println(status);
+  do
+  {
+    status = sensor_vl53l4cx_sat.VL53L4CX_GetMeasurementDataReady(&NewDataReady);
+    SerialPort.printf("  Status = %d\r\n", status);
   } while (!NewDataReady);
 
   // Led on
   digitalWrite(LedPin, HIGH);
 
-  if ((!status) && (NewDataReady != 0)) {
+  if ((!status) && (NewDataReady != 0))
+  {
     status =
         sensor_vl53l4cx_sat.VL53L4CX_GetMultiRangingData(pMultiRangingData);
-    no_of_object_found = pMultiRangingData->NumberOfObjectsFound;
 
-    snprintf(report, sizeof(report), "VL53L4CX Satellite: Count=%d, #Objs=%1d ",
-             pMultiRangingData->StreamCount, no_of_object_found);
-    SerialPort.print(report);
-    for (j = 0; j < no_of_object_found; j++) {
-      SerialPort.print("\r\n                               ");
-      SerialPort.print("status=");
-      SerialPort.print(pMultiRangingData->RangeData[j].RangeStatus);
-      SerialPort.print(", D=");
-      SerialPort.print(pMultiRangingData->RangeData[j].RangeMilliMeter);
-      SerialPort.print("mm");
-      SerialPort.print(", Signal=");
-      SerialPort.print(
-          (float)pMultiRangingData->RangeData[j].SignalRateRtnMegaCps /
-          65536.0);
-      SerialPort.print(" Mcps, Ambient=");
-      SerialPort.print(
-          (float)pMultiRangingData->RangeData[j].AmbientRateRtnMegaCps /
-          65536.0);
-      SerialPort.print(" Mcps, ");
-      SerialPort.print(VL53L4CX_RangeStatusCode(
-          pMultiRangingData->RangeData[j].RangeStatus));
+    SerialPort.printf("Measurement count: %d; Nr of Objects: %d\r\n", pMultiRangingData->StreamCount, pMultiRangingData->NumberOfObjectsFound);
+    SerialPort.printf("  HasXTalkValueChanged: %d; EffectiveSpadRtnCount: %d\r\n", pMultiRangingData->HasXtalkValueChanged, pMultiRangingData->EffectiveSpadRtnCount/256);
+    for (int j = 0; j < pMultiRangingData->NumberOfObjectsFound; j++)
+    {
+      SerialPort.printf("\t%d: Status:",j);
+      SerialPort.println(VL53L4CX_RangeStatusCode(pMultiRangingData->RangeData[j].RangeStatus));
+      SerialPort.printf("\t%d: Range: %dmm\r\n", j, pMultiRangingData->RangeData[j].RangeMilliMeter);
+      SerialPort.printf("\t%d: Signal: %fMcps; Ambient: %fMcps\r\n", j, (float)pMultiRangingData->RangeData[j].SignalRateRtnMegaCps / 65536.0, (float)pMultiRangingData->RangeData[j].AmbientRateRtnMegaCps / 65536.0);
+      SerialPort.printf("\t%d: MinRange: %dmm; MaxRange: %dmm\r\n", j, pMultiRangingData->RangeData[j].RangeMinMilliMeter, pMultiRangingData->RangeData[j].RangeMaxMilliMeter);
     }
-    SerialPort.println();
   }
-  if (status == 0) {
+  if (status == 0)
+  {
     status = sensor_vl53l4cx_sat.VL53L4CX_ClearInterruptAndStartMeasurement();
+    SerialPort.printf("Interupt status = %d\r\n", status);
   }
 
-  //sensor_vl53l4cx_sat.VL53L4CX_StopMeasurement();
+  // sensor_vl53l4cx_sat.VL53L4CX_StopMeasurement();
   digitalWrite(LedPin, LOW);
-  delay(250);
+  delay(500);
 }

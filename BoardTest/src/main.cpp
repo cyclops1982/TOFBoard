@@ -119,17 +119,37 @@ void setup()
   // Initialize I2C bus.
   DEV_I2C.begin();
 
-  // Configure VL53L4CX satellite component.
-  sensor_vl53l4cx_sat.begin();
-
-  // Initialize VL53L4CX satellite component.
-  sensor_vl53l4cx_sat.InitSensor(0x12);
   VL53L4CX_Error status;
+  sensor_vl53l4cx_sat.begin(); // we don't have xshut, so this doesn't actually do a lot.
 
-  status = sensor_vl53l4cx_sat.VL53L4CX_SetMeasurementTimingBudgetMicroSeconds(10000000 - 1);
+  status = sensor_vl53l4cx_sat.InitSensor(0x12); // does WaitDeviceBooted() & DataInit()
+  SerialPort.printf("InitSensor: %d\r\n", status);
+
+  SerialPort.println("=== CALIBERATION ===");
+  status = sensor_vl53l4cx_sat.VL53L4CX_PerformRefSpadManagement();
+  SerialPort.printf("VL53L4CX_PerformRefSpadManagement status: %d\r\n", status);
+
+  status = sensor_vl53l4cx_sat.VL53L4CX_PerformXTalkCalibration();
+  SerialPort.printf("VL53L4CX_PerformXTalkCalibration status: %d\r\n", status);
+
+  status = sensor_vl53l4cx_sat.VL53L4CX_PerformOffsetPerVcselCalibration(600);
+  SerialPort.printf("VL53L4CX_PerformOffsetPerVcselCalibration status: %d\r\n", status);
+
+  VL53L4CX_CalibrationData_t calDataDummy;
+  VL53L4CX_CalibrationData_t *calData = &calDataDummy;
+  status = sensor_vl53l4cx_sat.VL53L4CX_GetCalibrationData(calData);
+  SerialPort.printf("VL53L4CX_GetCalibrationData status: %d\r\n", status);
+  SerialPort.println("=== CALIBERATION DONE ===");
+
+  status = sensor_vl53l4cx_sat.VL53L4CX_SetCalibrationData(calData);
+  SerialPort.printf("VL53L4CX_SetCalibrationData status: %d\r\n", status);
+
+  status = sensor_vl53l4cx_sat.VL53L4CX_SetMeasurementTimingBudgetMicroSeconds(200000);
   SerialPort.printf("VL53L4CX_SetMeasurementTimingBudgetMicroSeconds status: %d\r\n", status);
+
   status = sensor_vl53l4cx_sat.VL53L4CX_SetDistanceMode(VL53L4CX_DISTANCEMODE_LONG);
   SerialPort.printf("VL53L4CX_SetDistanceMode status: %d\r\n", status);
+
   status = sensor_vl53l4cx_sat.VL53L4CX_SmudgeCorrectionEnable(VL53L4CX_SMUDGE_CORRECTION_CONTINUOUS);
   SerialPort.printf("VL53L4CX_SmudgeCorrectionEnable status: %d\r\n", status);
 
@@ -161,10 +181,10 @@ void loop()
         sensor_vl53l4cx_sat.VL53L4CX_GetMultiRangingData(pMultiRangingData);
 
     SerialPort.printf("Measurement count: %d; Nr of Objects: %d\r\n", pMultiRangingData->StreamCount, pMultiRangingData->NumberOfObjectsFound);
-    SerialPort.printf("  HasXTalkValueChanged: %d; EffectiveSpadRtnCount: %d\r\n", pMultiRangingData->HasXtalkValueChanged, pMultiRangingData->EffectiveSpadRtnCount/256);
+    SerialPort.printf("  HasXTalkValueChanged: %d; EffectiveSpadRtnCount: %d\r\n", pMultiRangingData->HasXtalkValueChanged, pMultiRangingData->EffectiveSpadRtnCount / 256);
     for (int j = 0; j < pMultiRangingData->NumberOfObjectsFound; j++)
     {
-      SerialPort.printf("\t%d: Status:",j);
+      SerialPort.printf("\t%d: Status:", j);
       SerialPort.println(VL53L4CX_RangeStatusCode(pMultiRangingData->RangeData[j].RangeStatus));
       SerialPort.printf("\t%d: Range: %dmm\r\n", j, pMultiRangingData->RangeData[j].RangeMilliMeter);
       SerialPort.printf("\t%d: Signal: %fMcps; Ambient: %fMcps\r\n", j, (float)pMultiRangingData->RangeData[j].SignalRateRtnMegaCps / 65536.0, (float)pMultiRangingData->RangeData[j].AmbientRateRtnMegaCps / 65536.0);

@@ -4,6 +4,12 @@
 	(generator_version "9.0")
 	(uuid "93a9ddb8-bd0f-4685-8bfd-ac7f979aadd7")
 	(paper "A4")
+	(title_block
+		(title "ToF Board")
+		(date "2025-03-09")
+		(rev "0.3")
+		(comment 1 "This RJ45 connected ToF sensor allows the measurement of a water well (from the lid down).")
+	)
 	(lib_symbols
 		(symbol "Connector:Conn_01x04_Pin"
 			(pin_names
